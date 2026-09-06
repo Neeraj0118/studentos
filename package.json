@@ -1,0 +1,9 @@
+{
+  "name": "studentos-root",
+  "version": "1.0.0",
+  "description": "StudentOS Full-Stack Platform",
+  "scripts": {
+    "server": "cd server && npm start",
+    "client": "cd client && npm run dev"
+  }
+}

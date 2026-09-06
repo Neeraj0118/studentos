@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "shell",
+      "label": "Start Server (Node/Express)",
+      "command": "npm run server",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "type": "shell",
+      "label": "Start Client (React/Vite)",
+      "command": "npm run client",
+      "isBackground": true,
+      "problemMatcher": []
+    }
+  ]
+}
