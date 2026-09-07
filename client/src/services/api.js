@@ -1,4 +1,4 @@
-const API_BASE = '/api';
+const API_BASE = 'https://studentos-3yfg.onrender.com/api';
 
 export const getAuthToken = () => localStorage.getItem('studentos_token');
 export const setAuthToken = (token) => localStorage.setItem('studentos_token', token);
