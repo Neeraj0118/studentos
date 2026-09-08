@@ -2,7 +2,6 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { get, run } from '../db/database.js';
 import { JWT_SECRET } from '../middleware/auth.js';
-import { sendOtpEmail } from '../services/emailService.js';
 
 export const register = async (req, res) => {
   try {
@@ -80,105 +79,18 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
-    // Generate 6-digit OTP verification code
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes validity
-
-    await run('UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?', [
-      otpCode,
-      expiresAt,
-      user.id
-    ]);
-
-    // Send real OTP email via email service
-    await sendOtpEmail(cleanEmail, otpCode, user.name);
-
-    return res.json({
-      requiresOtp: true,
-      email: cleanEmail,
-      message: `Verification OTP code sent to your email (${cleanEmail}).`
-      // OTP code is NOT exposed in API response!
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    return res.status(500).json({ error: 'Server error during login.' });
-  }
-};
-
-export const verifyOtp = async (req, res) => {
-  try {
-    const { email, otpCode } = req.body;
-
-    if (!email || !otpCode) {
-      return res.status(400).json({ error: 'Email and OTP verification code are required.' });
-    }
-
-    const cleanEmail = email.toLowerCase().trim();
-    const user = await get('SELECT * FROM users WHERE email = ?', [cleanEmail]);
-    if (!user) {
-      return res.status(404).json({ error: 'User account not found.' });
-    }
-
-    if (!user.otp_code || user.otp_code.trim() !== otpCode.trim()) {
-      return res.status(400).json({ error: 'Invalid OTP verification code. Please check your email and try again.' });
-    }
-
-    const now = new Date();
-    const expiryDate = new Date(user.otp_expires_at);
-    if (now > expiryDate) {
-      return res.status(400).json({ error: 'OTP verification code has expired. Please request a new OTP.' });
-    }
-
-    // Clear OTP after successful verification
-    await run('UPDATE users SET otp_code = NULL, otp_expires_at = NULL WHERE id = ?', [user.id]);
-
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, {
       expiresIn: '7d'
     });
 
     return res.json({
-      message: 'Email OTP verification successful.',
+      message: 'Login successful.',
       token,
       user: { id: user.id, name: user.name, email: user.email }
     });
   } catch (error) {
-    console.error('Verify OTP error:', error);
-    return res.status(500).json({ error: 'Server error during OTP verification.' });
-  }
-};
-
-export const resendOtp = async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: 'Email address is required.' });
-    }
-
-    const cleanEmail = email.toLowerCase().trim();
-    const user = await get('SELECT * FROM users WHERE email = ?', [cleanEmail]);
-    if (!user) {
-      return res.status(404).json({ error: 'User account not found.' });
-    }
-
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-
-    await run('UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?', [
-      otpCode,
-      expiresAt,
-      user.id
-    ]);
-
-    // Send real OTP email via email service
-    await sendOtpEmail(cleanEmail, otpCode, user.name);
-
-    return res.json({
-      message: `A new OTP verification code has been sent to ${cleanEmail}.`
-    });
-  } catch (error) {
-    console.error('Resend OTP error:', error);
-    return res.status(500).json({ error: 'Failed to resend OTP.' });
+    console.error('Login error:', error);
+    return res.status(500).json({ error: 'Server error during login.' });
   }
 };
 

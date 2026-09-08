@@ -31,24 +31,8 @@ export const AuthProvider = ({ children }) => {
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
-    return res;
-  };
-
-  const verifyOtp = async (email, otpCode) => {
-    const res = await fetchApi('/auth/verify-otp', {
-      method: 'POST',
-      body: JSON.stringify({ email, otpCode })
-    });
     setAuthToken(res.token);
     setUser(res.user);
-    return res;
-  };
-
-  const resendOtp = async (email) => {
-    const res = await fetchApi('/auth/resend-otp', {
-      method: 'POST',
-      body: JSON.stringify({ email })
-    });
     return res;
   };
 
@@ -68,7 +52,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, verifyOtp, resendOtp, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
