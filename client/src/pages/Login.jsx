@@ -1,22 +1,64 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { GraduationCap, ArrowRight, Lock, Mail, AlertCircle } from 'lucide-react';
+import { GraduationCap, ArrowRight, Lock, Mail, AlertCircle, ShieldCheck, KeyRound, ArrowLeft, RefreshCw } from 'lucide-react';
 
 export default function Login({ onSwitchToRegister }) {
-  const { login } = useAuth();
+  const { login, verifyOtp, resendOtp, register } = useAuth();
+  
+  // Steps: 'credentials' or 'otp'
+  const [step, setStep] = useState('credentials');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpPreview, setOtpPreview] = useState('');
+  
   const [error, setError] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleCredentialsSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setInfoMessage('');
     setLoading(true);
     try {
-      await login(email, password);
+      const res = await login(email, password);
+      if (res.requiresOtp) {
+        setStep('otp');
+        setOtpPreview(res.otpCode || '');
+        setInfoMessage(`Verification OTP code sent to ${email}`);
+      }
     } catch (err) {
-      setError(err.message || 'Login failed. Please check credentials.');
+      setError(err.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setInfoMessage('');
+    setLoading(true);
+    try {
+      await verifyOtp(email, otpCode);
+    } catch (err) {
+      setError(err.message || 'OTP verification failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setError('');
+    setInfoMessage('');
+    setLoading(true);
+    try {
+      const res = await resendOtp(email);
+      setOtpPreview(res.otpCode || '');
+      setInfoMessage('A new OTP verification code has been sent.');
+    } catch (err) {
+      setError(err.message || 'Failed to resend OTP.');
     } finally {
       setLoading(false);
     }
@@ -24,15 +66,28 @@ export default function Login({ onSwitchToRegister }) {
 
   const handleDemoLogin = async () => {
     setError('');
+    setInfoMessage('');
     setLoading(true);
     try {
-      // Try login with demo account, or register if not existing
+      const demoEmail = 'demo@studentos.com';
+      const demoPass = 'password123';
       try {
-        await login('demo@studentos.com', 'password123');
+        const res = await login(demoEmail, demoPass);
+        setEmail(demoEmail);
+        if (res.requiresOtp) {
+          setStep('otp');
+          setOtpPreview(res.otpCode || '');
+          setInfoMessage(`Demo OTP code generated for ${demoEmail}`);
+        }
       } catch (err) {
-        // Register demo user
-        const { register } = useAuth();
-        await register('Demo Student', 'demo@studentos.com', 'password123');
+        await register('Demo Student', demoEmail, demoPass);
+        setEmail(demoEmail);
+        const res = await login(demoEmail, demoPass);
+        if (res.requiresOtp) {
+          setStep('otp');
+          setOtpPreview(res.otpCode || '');
+          setInfoMessage(`Demo OTP code generated for ${demoEmail}`);
+        }
       }
     } catch (err) {
       setError(err.message);
@@ -51,26 +106,52 @@ export default function Login({ onSwitchToRegister }) {
       position: 'relative'
     }}>
       <div className="glass-card glass-card-glow" style={{ width: '100%', maxWidth: '440px', padding: '2.5rem 2rem' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{
-            width: '54px',
-            height: '54px',
-            borderRadius: '16px',
-            background: 'linear-gradient(135deg, var(--primary) 0%, var(--accent-purple) 100%)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: 'var(--shadow-glow)',
-            marginBottom: '1rem'
-          }}>
-            <GraduationCap color="#fff" size={30} />
+        
+        {/* Step 1 Header: Login Credentials */}
+        {step === 'credentials' ? (
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <div style={{
+              width: '54px',
+              height: '54px',
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, var(--primary) 0%, var(--accent-purple) 100%)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: 'var(--shadow-glow)',
+              marginBottom: '1rem'
+            }}>
+              <GraduationCap color="#fff" size={30} />
+            </div>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Welcome to Student<span className="gradient-text">OS</span></h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
+              AI-Powered Academic & Placement Platform
+            </p>
           </div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Welcome to Student<span className="gradient-text">OS</span></h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-            AI-Powered Academic & Placement Platform
-          </p>
-        </div>
+        ) : (
+          /* Step 2 Header: 2FA Email OTP Verification */
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <div style={{
+              width: '54px',
+              height: '54px',
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-cyan) 100%)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 0 20px rgba(6, 182, 212, 0.3)',
+              marginBottom: '1rem'
+            }}>
+              <ShieldCheck color="#fff" size={30} />
+            </div>
+            <h2 style={{ fontSize: '1.6rem', fontWeight: 800 }}>2-Factor Email OTP</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginTop: '0.25rem' }}>
+              Verification code sent to <strong style={{ color: '#fff' }}>{email}</strong>
+            </p>
+          </div>
+        )}
 
+        {/* Error Alert */}
         {error && (
           <div style={{
             background: 'rgba(244, 63, 94, 0.15)',
@@ -89,81 +170,178 @@ export default function Login({ onSwitchToRegister }) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">Email Address</label>
-            <div style={{ position: 'relative' }}>
-              <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                type="email"
-                className="form-input"
-                style={{ paddingLeft: '2.75rem' }}
-                placeholder="student@university.edu"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
+        {/* Info Message Banner */}
+        {infoMessage && (
+          <div style={{
+            background: 'rgba(16, 185, 129, 0.15)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            color: '#6ee7b7',
+            padding: '0.75rem 1rem',
+            borderRadius: 'var(--radius-md)',
+            fontSize: '0.85rem',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <ShieldCheck size={18} />
+            <span>{infoMessage}</span>
           </div>
+        )}
 
-          <div className="form-group">
-            <label className="form-label">Password</label>
-            <div style={{ position: 'relative' }}>
-              <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                type="password"
-                className="form-input"
-                style={{ paddingLeft: '2.75rem' }}
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+        {/* STEP 1 FORM: Email & Password */}
+        {step === 'credentials' ? (
+          <>
+            <form onSubmit={handleCredentialsSubmit}>
+              <div className="form-group">
+                <label className="form-label">Email Address</label>
+                <div style={{ position: 'relative' }}>
+                  <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="email"
+                    className="form-input"
+                    style={{ paddingLeft: '2.75rem' }}
+                    placeholder="student@university.edu"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Password</label>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="password"
+                    className="form-input"
+                    style={{ paddingLeft: '2.75rem' }}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading}
+                style={{ width: '100%', marginTop: '0.5rem', padding: '0.85rem' }}
+              >
+                {loading ? 'Verifying Password...' : 'Continue to OTP Verification'} <ArrowRight size={18} />
+              </button>
+            </form>
+
+            <div style={{ margin: '1.5rem 0', textAlign: 'center', position: 'relative' }}>
+              <hr style={{ borderColor: 'var(--border-glass)' }} />
+              <span style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                background: '#111827',
+                padding: '0 0.75rem',
+                fontSize: '0.75rem',
+                color: 'var(--text-muted)'
+              }}>OR</span>
             </div>
-          </div>
 
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={loading}
-            style={{ width: '100%', marginTop: '0.5rem', padding: '0.85rem' }}
-          >
-            {loading ? 'Signing In...' : 'Sign In to Dashboard'} <ArrowRight size={18} />
-          </button>
-        </form>
+            <button
+              type="button"
+              onClick={handleDemoLogin}
+              className="btn btn-secondary"
+              style={{ width: '100%', padding: '0.75rem' }}
+            >
+              ⚡ Quick Demo Sign In
+            </button>
 
-        <div style={{ margin: '1.5rem 0', textAlign: 'center', position: 'relative' }}>
-          <hr style={{ borderColor: 'var(--border-glass)' }} />
-          <span style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            background: '#111827',
-            padding: '0 0.75rem',
-            fontSize: '0.75rem',
-            color: 'var(--text-muted)'
-          }}>OR</span>
-        </div>
+            <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              Don't have an account?{' '}
+              <button
+                onClick={onSwitchToRegister}
+                style={{ background: 'none', border: 'none', color: '#818cf8', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Register Now
+              </button>
+            </div>
+          </>
+        ) : (
+          /* STEP 2 FORM: 6-Digit Email OTP Input */
+          <>
+            {/* Demo Helper Banner showing generated OTP */}
+            {otpPreview && (
+              <div style={{
+                background: 'rgba(99, 102, 241, 0.15)',
+                border: '1px solid rgba(99, 102, 241, 0.4)',
+                borderRadius: 'var(--radius-md)',
+                padding: '1rem',
+                textAlign: 'center',
+                marginBottom: '1.5rem'
+              }}>
+                <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--accent-purple)', fontWeight: 700, letterSpacing: '0.05em' }}>
+                  🔑 2FA Security OTP Code
+                </div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 800, letterSpacing: '0.3em', color: '#fff', margin: '0.2rem 0' }}>
+                  {otpPreview}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Enter this 6-digit verification code below
+                </div>
+              </div>
+            )}
 
-        <button
-          type="button"
-          onClick={handleDemoLogin}
-          className="btn btn-secondary"
-          style={{ width: '100%', padding: '0.75rem' }}
-        >
-          ⚡ Quick Demo Sign In
-        </button>
+            <form onSubmit={handleOtpSubmit}>
+              <div className="form-group">
+                <label className="form-label">Enter 6-Digit Verification OTP *</label>
+                <div style={{ position: 'relative' }}>
+                  <KeyRound size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    maxLength={6}
+                    className="form-input"
+                    style={{ paddingLeft: '2.75rem', letterSpacing: '0.25em', fontSize: '1.1rem', fontWeight: 700 }}
+                    placeholder="123456"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
 
-        <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-          Don't have an account?{' '}
-          <button
-            onClick={onSwitchToRegister}
-            style={{ background: 'none', border: 'none', color: '#818cf8', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-          >
-            Register Now
-          </button>
-        </div>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading || otpCode.length < 6}
+                style={{ width: '100%', marginTop: '0.5rem', padding: '0.85rem' }}
+              >
+                {loading ? 'Verifying OTP...' : 'Verify OTP & Enter Dashboard'} <ArrowRight size={18} />
+              </button>
+            </form>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
+              <button
+                type="button"
+                onClick={() => { setStep('credentials'); setOtpCode(''); setError(''); setInfoMessage(''); }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+              >
+                <ArrowLeft size={14} /> Change Email
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={loading}
+                style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+              >
+                <RefreshCw size={13} /> Resend OTP
+              </button>
+            </div>
+          </>
+        )}
+
       </div>
     </div>
   );

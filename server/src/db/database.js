@@ -53,9 +53,24 @@ export const initDb = async () => {
       name TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      otp_code TEXT,
+      otp_expires_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // Migrations for existing database: add OTP columns if not exist
+  try {
+    await run('ALTER TABLE users ADD COLUMN otp_code TEXT;');
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    await run('ALTER TABLE users ADD COLUMN otp_expires_at DATETIME;');
+  } catch (e) {
+    // Column already exists
+  }
 
   // Subjects table
   await run(`
