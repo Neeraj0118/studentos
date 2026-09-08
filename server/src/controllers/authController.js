@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { get, run } from '../db/database.js';
 import { JWT_SECRET } from '../middleware/auth.js';
+import { sendOtpEmail } from '../services/emailService.js';
 
 export const register = async (req, res) => {
   try {
@@ -15,9 +16,12 @@ export const register = async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
     }
 
-    const existingUser = await get('SELECT * FROM users WHERE email = ?', [email.toLowerCase().trim()]);
+    const cleanEmail = email.toLowerCase().trim();
+
+    // Enforce unique registration per email
+    const existingUser = await get('SELECT * FROM users WHERE email = ?', [cleanEmail]);
     if (existingUser) {
-      return res.status(400).json({ error: 'An account with this email address already exists.' });
+      return res.status(400).json({ error: 'An account with this email address already exists. Please sign in instead.' });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -25,7 +29,7 @@ export const register = async (req, res) => {
 
     const result = await run(
       'INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)',
-      [name.trim(), email.toLowerCase().trim(), password_hash]
+      [name.trim(), cleanEmail, password_hash]
     );
 
     const userId = result.id;
@@ -42,14 +46,14 @@ export const register = async (req, res) => {
       ]);
     }
 
-    const token = jwt.sign({ id: userId, email: email.toLowerCase().trim() }, JWT_SECRET, {
+    const token = jwt.sign({ id: userId, email: cleanEmail }, JWT_SECRET, {
       expiresIn: '7d'
     });
 
     return res.status(201).json({
       message: 'Account created successfully.',
       token,
-      user: { id: userId, name: name.trim(), email: email.toLowerCase().trim() }
+      user: { id: userId, name: name.trim(), email: cleanEmail }
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -65,7 +69,8 @@ export const login = async (req, res) => {
       return res.status(400).json({ error: 'Please provide email and password.' });
     }
 
-    const user = await get('SELECT * FROM users WHERE email = ?', [email.toLowerCase().trim()]);
+    const cleanEmail = email.toLowerCase().trim();
+    const user = await get('SELECT * FROM users WHERE email = ?', [cleanEmail]);
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
@@ -85,13 +90,14 @@ export const login = async (req, res) => {
       user.id
     ]);
 
-    console.log(`[OTP VERIFICATION] Sent OTP ${otpCode} to user ${user.email}`);
+    // Send real OTP email via email service
+    await sendOtpEmail(cleanEmail, otpCode, user.name);
 
     return res.json({
       requiresOtp: true,
-      email: user.email,
-      message: `OTP verification code sent to ${user.email}`,
-      otpCode: otpCode // Returned for easy testing & demo preview
+      email: cleanEmail,
+      message: `Verification OTP code sent to your email (${cleanEmail}).`
+      // OTP code is NOT exposed in API response!
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -107,13 +113,14 @@ export const verifyOtp = async (req, res) => {
       return res.status(400).json({ error: 'Email and OTP verification code are required.' });
     }
 
-    const user = await get('SELECT * FROM users WHERE email = ?', [email.toLowerCase().trim()]);
+    const cleanEmail = email.toLowerCase().trim();
+    const user = await get('SELECT * FROM users WHERE email = ?', [cleanEmail]);
     if (!user) {
       return res.status(404).json({ error: 'User account not found.' });
     }
 
     if (!user.otp_code || user.otp_code.trim() !== otpCode.trim()) {
-      return res.status(400).json({ error: 'Invalid OTP verification code. Please check and try again.' });
+      return res.status(400).json({ error: 'Invalid OTP verification code. Please check your email and try again.' });
     }
 
     const now = new Date();
@@ -148,7 +155,8 @@ export const resendOtp = async (req, res) => {
       return res.status(400).json({ error: 'Email address is required.' });
     }
 
-    const user = await get('SELECT * FROM users WHERE email = ?', [email.toLowerCase().trim()]);
+    const cleanEmail = email.toLowerCase().trim();
+    const user = await get('SELECT * FROM users WHERE email = ?', [cleanEmail]);
     if (!user) {
       return res.status(404).json({ error: 'User account not found.' });
     }
@@ -162,11 +170,11 @@ export const resendOtp = async (req, res) => {
       user.id
     ]);
 
-    console.log(`[OTP VERIFICATION] Resent OTP ${otpCode} to user ${user.email}`);
+    // Send real OTP email via email service
+    await sendOtpEmail(cleanEmail, otpCode, user.name);
 
     return res.json({
-      message: `New OTP verification code sent to ${user.email}`,
-      otpCode: otpCode
+      message: `A new OTP verification code has been sent to ${cleanEmail}.`
     });
   } catch (error) {
     console.error('Resend OTP error:', error);

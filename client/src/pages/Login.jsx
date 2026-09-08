@@ -10,7 +10,6 @@ export default function Login({ onSwitchToRegister }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otpCode, setOtpCode] = useState('');
-  const [otpPreview, setOtpPreview] = useState('');
   
   const [error, setError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
@@ -25,8 +24,7 @@ export default function Login({ onSwitchToRegister }) {
       const res = await login(email, password);
       if (res.requiresOtp) {
         setStep('otp');
-        setOtpPreview(res.otpCode || '');
-        setInfoMessage(`Verification OTP code sent to ${email}`);
+        setInfoMessage(`Verification OTP code has been sent to your email (${email}). Please check your inbox.`);
       }
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
@@ -54,9 +52,8 @@ export default function Login({ onSwitchToRegister }) {
     setInfoMessage('');
     setLoading(true);
     try {
-      const res = await resendOtp(email);
-      setOtpPreview(res.otpCode || '');
-      setInfoMessage('A new OTP verification code has been sent.');
+      await resendOtp(email);
+      setInfoMessage(`A new OTP verification code has been sent to ${email}.`);
     } catch (err) {
       setError(err.message || 'Failed to resend OTP.');
     } finally {
@@ -76,8 +73,7 @@ export default function Login({ onSwitchToRegister }) {
         setEmail(demoEmail);
         if (res.requiresOtp) {
           setStep('otp');
-          setOtpPreview(res.otpCode || '');
-          setInfoMessage(`Demo OTP code generated for ${demoEmail}`);
+          setInfoMessage(`OTP verification code sent to ${demoEmail}`);
         }
       } catch (err) {
         await register('Demo Student', demoEmail, demoPass);
@@ -85,8 +81,7 @@ export default function Login({ onSwitchToRegister }) {
         const res = await login(demoEmail, demoPass);
         if (res.requiresOtp) {
           setStep('otp');
-          setOtpPreview(res.otpCode || '');
-          setInfoMessage(`Demo OTP code generated for ${demoEmail}`);
+          setInfoMessage(`OTP verification code sent to ${demoEmail}`);
         }
       }
     } catch (err) {
@@ -144,9 +139,9 @@ export default function Login({ onSwitchToRegister }) {
             }}>
               <ShieldCheck color="#fff" size={30} />
             </div>
-            <h2 style={{ fontSize: '1.6rem', fontWeight: 800 }}>2-Factor Email OTP</h2>
+            <h2 style={{ fontSize: '1.6rem', fontWeight: 800 }}>Check Your Email</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginTop: '0.25rem' }}>
-              Verification code sent to <strong style={{ color: '#fff' }}>{email}</strong>
+              Enter the 6-digit OTP code sent to <strong style={{ color: '#fff' }}>{email}</strong>
             </p>
           </div>
         )}
@@ -231,7 +226,7 @@ export default function Login({ onSwitchToRegister }) {
                 disabled={loading}
                 style={{ width: '100%', marginTop: '0.5rem', padding: '0.85rem' }}
               >
-                {loading ? 'Verifying Password...' : 'Continue to OTP Verification'} <ArrowRight size={18} />
+                {loading ? 'Verifying Password...' : 'Continue to Email OTP'} <ArrowRight size={18} />
               </button>
             </form>
 
@@ -271,31 +266,9 @@ export default function Login({ onSwitchToRegister }) {
         ) : (
           /* STEP 2 FORM: 6-Digit Email OTP Input */
           <>
-            {/* Demo Helper Banner showing generated OTP */}
-            {otpPreview && (
-              <div style={{
-                background: 'rgba(99, 102, 241, 0.15)',
-                border: '1px solid rgba(99, 102, 241, 0.4)',
-                borderRadius: 'var(--radius-md)',
-                padding: '1rem',
-                textAlign: 'center',
-                marginBottom: '1.5rem'
-              }}>
-                <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--accent-purple)', fontWeight: 700, letterSpacing: '0.05em' }}>
-                  🔑 2FA Security OTP Code
-                </div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 800, letterSpacing: '0.3em', color: '#fff', margin: '0.2rem 0' }}>
-                  {otpPreview}
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  Enter this 6-digit verification code below
-                </div>
-              </div>
-            )}
-
             <form onSubmit={handleOtpSubmit}>
               <div className="form-group">
-                <label className="form-label">Enter 6-Digit Verification OTP *</label>
+                <label className="form-label">Enter 6-Digit Verification Code *</label>
                 <div style={{ position: 'relative' }}>
                   <KeyRound size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                   <input
@@ -317,7 +290,7 @@ export default function Login({ onSwitchToRegister }) {
                 disabled={loading || otpCode.length < 6}
                 style={{ width: '100%', marginTop: '0.5rem', padding: '0.85rem' }}
               >
-                {loading ? 'Verifying OTP...' : 'Verify OTP & Enter Dashboard'} <ArrowRight size={18} />
+                {loading ? 'Verifying OTP...' : 'Verify & Enter Dashboard'} <ArrowRight size={18} />
               </button>
             </form>
 
@@ -327,7 +300,7 @@ export default function Login({ onSwitchToRegister }) {
                 onClick={() => { setStep('credentials'); setOtpCode(''); setError(''); setInfoMessage(''); }}
                 style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
               >
-                <ArrowLeft size={14} /> Change Email
+                <ArrowLeft size={14} /> Back to Login
               </button>
 
               <button
